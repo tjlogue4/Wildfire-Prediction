@@ -11,6 +11,7 @@ import platform
 import time
 from random import randrange
 import multiprocessing as mp
+import subprocess
 
 
 
@@ -84,17 +85,25 @@ class download:
 	# downloads, B04, B8A, and B12 specifically, in future should add functionality to specify
 	# resoltion, and more bands like so: L2A(self, result, resolution = 20, bands = ['B04', 'B8A', 'B12'])
 	def L2A(self, result):
-
+		#sleep = randrange(5)
+		#time.sleep(sleep)
 		base_url = result[0]
 		granule_id = result[1]
-		l2a_path = f'{self.path}/{granule_id}'
+
+		if self.platform == 'Windows':
+			l2a_path = f'{self.path}\{granule_id}'
+		else:
+			l2a_path = f'{self.path}/{granule_id}'
 
 		Path(l2a_path).mkdir(parents=True, exist_ok=True)
 
 		base_url_granule = base_url+'/GRANULE/'+granule_id
 
 		for type in ['B04', 'B8A', 'B12']:
-			os.system(f'gsutil cp -r "{base_url_granule}/IMG_DATA/R20m/*{type}*" {l2a_path}')
+			# using suprocess becasue gsutil creates a tempfile that other processes cannot open when using multiprocessing
+			p = subprocess.Popen(['gsutil', 'cp', '-r', f'{base_url_granule}/IMG_DATA/R20m/*{type}*', f'{l2a_path}'], cwd = l2a_path, shell = True)
+
+			p.wait()
 
 
 		return l2a_path, granule_id
@@ -238,7 +247,7 @@ def process_L1C(path, thresh, bucket, sen2cor_path, sql_conn):
 
 # download and process an L2A product
 def process_L2A(args):
-	sleep = randrange(20)
+	sleep = randrange(5)
 	time.sleep(sleep)
 	result, path, thresh, bucket, sql_conn = args
 	process_start = time.time()
