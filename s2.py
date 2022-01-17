@@ -54,6 +54,26 @@ class sql:
 		
 		return self.results
 
+
+	def get_metadata(self, granule_id):
+		engine = create_engine(f"mysql+pymysql://{self.user}:{self.password}@{self.endpoint}/{self.schema}")
+		connection = engine.raw_connection()
+		try:
+			cursor_obj = connection.cursor()
+			cursor_obj.execute(f'SELECT SENSING_TIME, UNIQUE_ID, NEXT_TILE, MGRS FROM {self.schema}.{self.table} WHERE GRANULE_ID = {granule_id}')
+			results = cursor_obj.fetchall()
+			cursor_obj.close()
+		finally:
+			connection.close()	
+
+		sensing_time = results[0]
+		unique_id = results[1]
+		next_tile = results[2]
+		mgrs = results[3]
+
+		return sensing_time, unique_id, next_tile, mgrs
+
+
 	#updates the database to add how L1C/ l2A took to process
 	def update_status(self, process_time, granule_id):
 		stmt = f'UPDATE {self.table} SET PROCESS_TIME = :total_time, PROCESSED = 1 WHERE {self.table}.GRANULE_ID  = :granule_id'
@@ -89,6 +109,8 @@ class download:
 		#time.sleep(sleep)
 		base_url = result[0]
 		granule_id = result[1]
+		mgrs = result[3]
+		sensing_time = result[4]
 
 		if self.platform == 'Windows':
 			l2a_path = f'{self.path}\{granule_id}'
@@ -104,9 +126,15 @@ class download:
 			p = subprocess.Popen(['gsutil', 'cp', '-r', f'{base_url_granule}/IMG_DATA/R20m/*{type}*', f'{l2a_path}'], cwd = l2a_path, shell = True)
 
 			p.wait()
-
-
+		
 		return l2a_path, granule_id
+
+	def L2A_h5(self, bucket):
+		os.system(f'aws s3 cp {bucket}/L2A {self.path}/L2A --recursive')
+	
+	# may be omiited later if decide to use SQL1
+	def weather_h5(self, bucket):
+		os.system(f'aws s3 cp {bucket}/weather {self.path}/weather --recursive')
 	
 
 
@@ -184,7 +212,7 @@ class process:
 		self.NDVI = self.NDVI.astype('float32')
 
 	# function that combines the B12 and NDVI into a one file and saves it locally
-	def save_B12_NDVI(self, granule_id):
+	def save_B12_NDVI(self, granule_id, sensing_time, unique_id, next_tile, mgrs):
 			self.granule_id = granule_id
 
 			if self.platform == 'Windows':
@@ -195,6 +223,11 @@ class process:
 			hf.create_dataset('NDVI', data=self.NDVI, dtype = 'float32', compression="lzf")
 
 			hf.attrs['granule_id'] = granule_id
+			hf.attrs['sensing_time'] = sensing_time
+			hf.attrs['unique_id'] = unique_id
+			hf.attrs['next_tile'] = next_tile
+			hf.attrs['mgrs'] = mgrs
+
 			hf.close()
 
 	# function for viewing tiles after they are processed and prepared for nueral network
@@ -227,6 +260,11 @@ class process:
 		self.NDVI_split = [self.NDVI[x:x+M,y:y+N] for x in range(0,self.NDVI.shape[0],M) for y in range(0,self.NDVI.shape[1],N)]
 
 
+
+
+
+
+
 # process single .safe folder
 def process_L1C(path, thresh, bucket, sen2cor_path, sql_conn):
 	process_start = time.time()
@@ -239,7 +277,8 @@ def process_L1C(path, thresh, bucket, sen2cor_path, sql_conn):
 	p.convert_L1C(sen2cor_path)
 	p.create_B12()
 	p.create_NDVI()
-	p.save_B12_NDVI(granule_id)
+	sensing_time, unique_id, next_tile, mgrs = sql_conn.get_metadata(granule_id)
+	p.save_B12_NDVI(granule_id, sensing_time, unique_id, next_tile, mgrs)
 	p.to_s3()
 	process_end = time.time()
 	total_time = round((process_end - process_start) /60, 2)
@@ -255,8 +294,9 @@ def process_L2A(args):
 	p = process(l2a_path, thresh, bucket)
 	p.create_B12()
 	p.create_NDVI()
-	p.save_B12_NDVI(granule_id)
-	p.to_s3()
+	sensing_time, unique_id, next_tile, mgrs = sql_conn.get_metadata(granule_id)
+	p.save_B12_NDVI(granule_id, sensing_time, unique_id, next_tile, mgrs)
+	#p.to_s3()
 	process_end = time.time()
 	total_time = round((process_end - process_start) /60, 2)
 	sql_conn.update_status(total_time, granule_id)
@@ -283,4 +323,6 @@ def mp_process_L2A(results, path, thresh, bucket, sql_conn, num_cores):
 	stuff_to_pass = [path, thresh, bucket, sql_conn]
 	pool.map(process_L2A, [(result, *stuff_to_pass) for result in results])
 	pool.close()
+
+
 	
