@@ -66,12 +66,36 @@ class sql:
 		finally:
 			connection.close()	
 
-		sensing_time = results[0]
-		unique_id = results[1]
-		next_tile = results[2]
-		mgrs = results[3]
+		self.sensing_time = results[0]
+		self.unique_id = results[1]
+		self.next_tile = results[2]
+		self.mgrs = results[3]
 
-		return sensing_time, unique_id, next_tile, mgrs
+		return self.sensing_time, self.unique_id, self.next_tile, self.mgrs
+
+
+	def get_weather(self):
+		engine = create_engine(f"mysql+pymysql://{self.user}:{self.password}@{self.endpoint}/{self.schema}")
+		connection = engine.raw_connection()
+		try:
+			cursor_obj = connection.cursor()
+			cursor_obj.execute(f'''SELECT WIND_ANGLE, WIND_SPEED, AIR_TEMP, ATM_PRESSURE 
+									FROM dev.weather 
+									WHERE MGRS = {self.mgrs} 
+									AND DATE = {self.sensing_time} 
+									AND TIME BETWEEN "18:00" 
+									AND "23:59"''')
+			results = cursor_obj.fetchall()
+			cursor_obj.close()
+		finally:
+			connection.close()	
+
+		#turns tuple into array then transposes so that all weather data is together rather than row by row
+		# so instead of [[wind_speed, air_temp], [wind_speed, air_temp]]
+		# it is [[wind_speed, wind_speed],[air_temp, air_temp]]
+		weather = np.asarray(results, dtype = 'float32').transpose() 
+
+		return weather
 
 
 	#updates the database to add how L1C/ l2A took to process
@@ -212,7 +236,7 @@ class process:
 		self.NDVI = self.NDVI.astype('float32')
 
 	# function that combines the B12 and NDVI into a one file and saves it locally
-	def save_B12_NDVI(self, granule_id, sensing_time, unique_id, next_tile, mgrs):
+	def save_hdf5(self, granule_id, weather, sensing_time, unique_id, next_tile, mgrs):
 			self.granule_id = granule_id
 
 			if self.platform == 'Windows':
@@ -221,6 +245,7 @@ class process:
 				hf = h5py.File(f'{self.path}/{granule_id}.h5', 'w')
 			hf.create_dataset('B12', data=self.B12, dtype ='bool',  compression="lzf") # lzf best for low overhead and good results, only for python
 			hf.create_dataset('NDVI', data=self.NDVI, dtype = 'float32', compression="lzf")
+			hf.create_dataset('WEATHER', data=weather, dtype = 'float32', compression="lzf")
 
 			hf.attrs['granule_id'] = granule_id
 			hf.attrs['sensing_time'] = sensing_time
@@ -261,10 +286,6 @@ class process:
 
 
 
-
-
-
-
 # process single .safe folder
 def process_L1C(path, thresh, bucket, sen2cor_path, sql_conn):
 	process_start = time.time()
@@ -278,7 +299,8 @@ def process_L1C(path, thresh, bucket, sen2cor_path, sql_conn):
 	p.create_B12()
 	p.create_NDVI()
 	sensing_time, unique_id, next_tile, mgrs = sql_conn.get_metadata(granule_id)
-	p.save_B12_NDVI(granule_id, sensing_time, unique_id, next_tile, mgrs)
+	weather = sql_conn.get_weather()
+	p.save_hdf5(granule_id, weather, sensing_time, unique_id, next_tile, mgrs)
 	p.to_s3()
 	process_end = time.time()
 	total_time = round((process_end - process_start) /60, 2)
@@ -295,7 +317,8 @@ def process_L2A(args):
 	p.create_B12()
 	p.create_NDVI()
 	sensing_time, unique_id, next_tile, mgrs = sql_conn.get_metadata(granule_id)
-	p.save_B12_NDVI(granule_id, sensing_time, unique_id, next_tile, mgrs)
+	weather = sql_conn.get_weather()
+	p.save_hdf5(granule_id, weather, sensing_time, unique_id, next_tile, mgrs)
 	#p.to_s3()
 	process_end = time.time()
 	total_time = round((process_end - process_start) /60, 2)
