@@ -56,20 +56,21 @@ class sql:
 
 
 	def get_metadata(self, granule_id):
+
 		engine = create_engine(f"mysql+pymysql://{self.user}:{self.password}@{self.endpoint}/{self.schema}")
 		connection = engine.raw_connection()
 		try:
 			cursor_obj = connection.cursor()
-			cursor_obj.execute(f'SELECT SENSING_TIME, UNIQUE_ID, NEXT_TILE, MGRS FROM {self.schema}.{self.table} WHERE GRANULE_ID = {granule_id}')
+			cursor_obj.execute(f'SELECT SENSING_TIME, UNIQUE_ID, NEXT_TILE, MGRS FROM {self.schema}.{self.table} WHERE {self.table}.GRANULE_ID = "{granule_id}"')
 			results = cursor_obj.fetchall()
 			cursor_obj.close()
 		finally:
 			connection.close()	
 
-		self.sensing_time = results[0]
-		self.unique_id = results[1]
-		self.next_tile = results[2]
-		self.mgrs = results[3]
+		self.sensing_time = str(results[0][0])
+		self.unique_id = results[0][1]
+		self.next_tile = results[0][2]
+		self.mgrs = results[0][3]
 
 		return self.sensing_time, self.unique_id, self.next_tile, self.mgrs
 
@@ -81,8 +82,8 @@ class sql:
 			cursor_obj = connection.cursor()
 			cursor_obj.execute(f'''SELECT WIND_ANGLE, WIND_SPEED, AIR_TEMP, ATM_PRESSURE 
 									FROM dev.weather 
-									WHERE MGRS = {self.mgrs} 
-									AND DATE = {self.sensing_time} 
+									WHERE MGRS = "{self.mgrs}" 
+									AND DATE = "{self.sensing_time}" 
 									AND TIME BETWEEN "18:00" 
 									AND "23:59"''')
 			results = cursor_obj.fetchall()
@@ -133,8 +134,6 @@ class download:
 		#time.sleep(sleep)
 		base_url = result[0]
 		granule_id = result[1]
-		mgrs = result[3]
-		sensing_time = result[4]
 
 		if self.platform == 'Windows':
 			l2a_path = f'{self.path}\{granule_id}'
@@ -319,7 +318,7 @@ def process_L2A(args):
 	sensing_time, unique_id, next_tile, mgrs = sql_conn.get_metadata(granule_id)
 	weather = sql_conn.get_weather()
 	p.save_hdf5(granule_id, weather, sensing_time, unique_id, next_tile, mgrs)
-	#p.to_s3()
+	p.to_s3()
 	process_end = time.time()
 	total_time = round((process_end - process_start) /60, 2)
 	sql_conn.update_status(total_time, granule_id)
