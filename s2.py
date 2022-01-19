@@ -18,8 +18,7 @@ import subprocess
 
 # Class for sql related events
 class sql:
-	def __init__(self, level, mode, user, password, endpoint, schema, table, instance_id, num_processes, update=True):
-		self.purpose = level
+	def __init__(self, mode, user, password, endpoint, schema, table, instance_id, num_processes, update=True):
 		self.mode = mode
 		self.user = user
 		self.password = password
@@ -67,7 +66,7 @@ class sql:
 		finally:
 			connection.close()	
 
-		self.sensing_time = str(results[0][0])
+		self.sensing_time = str(results[0][0]) # why did I make this a string (I think it came is at dt object)
 		self.unique_id = results[0][1]
 		self.next_tile = results[0][2]
 		self.mgrs = results[0][3]
@@ -83,7 +82,7 @@ class sql:
 			cursor_obj.execute(f'''SELECT WIND_ANGLE, WIND_SPEED, AIR_TEMP, ATM_PRESSURE 
 									FROM dev.weather 
 									WHERE MGRS = "{self.mgrs}" 
-									AND DATE = "{self.sensing_time}" 
+									AND DATE = DATE("{self.sensing_time}") 
 									AND TIME BETWEEN "18:00" 
 									AND "23:59"''')
 			results = cursor_obj.fetchall()
@@ -113,8 +112,9 @@ class sql:
 
 # Class for downloading stuff
 class download:
-	def __init__(self, path):
+	def __init__(self, path, results):
 		self.path = path
+		self.results = results
 		self.platform = platform.system()
 
 	# downloads entire safe folder
@@ -155,7 +155,7 @@ class download:
 	def L2A_h5(self, bucket):
 		os.system(f'aws s3 cp {bucket}/L2A {self.path}/L2A --recursive')
 	
-	# may be omiited later if decide to use SQL1
+	# may be omiited later if decide to use SQL
 	def weather_h5(self, bucket):
 		os.system(f'aws s3 cp {bucket}/weather {self.path}/weather --recursive')
 	
@@ -286,7 +286,8 @@ class process:
 
 
 # process single .safe folder
-def process_L1C(path, thresh, bucket, sen2cor_path, sql_conn):
+def process_L1C(args):
+	path, thresh, bucket, sen2cor_path, sql_conn = args
 	process_start = time.time()
 	if platform.system() == "Windows":
 		split_path = glob.glob(f'{path}\GRANULE\*')[0].split('\\')
@@ -307,7 +308,7 @@ def process_L1C(path, thresh, bucket, sen2cor_path, sql_conn):
 
 # download and process an L2A product
 def process_L2A(args):
-	sleep = randrange(5)
+	sleep = randrange(10)
 	time.sleep(sleep)
 	result, path, thresh, bucket, sql_conn = args
 	process_start = time.time()
