@@ -18,8 +18,7 @@ import subprocess
 
 # Class for sql related events
 class sql:
-	def __init__(self, mode, user, password, endpoint, schema, table, instance_id, num_processes, update=True):
-		self.mode = mode
+	def __init__(self, user, password, endpoint, schema, table, instance_id, num_processes, update=True):
 		self.user = user
 		self.password = password
 		self.endpoint = endpoint
