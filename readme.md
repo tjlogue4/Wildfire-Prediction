@@ -10,6 +10,7 @@ The goal of this project is to use historical weather data and sentinel-2 satali
 ## Exploration:
 * [Exploration and Cleanup of Weather Data.ipynb](https://github.com/tjlogue4/Wildfire-Prediction/blob/main/Exploration%20and%20Cleanup%20of%20Weather%20Data.ipynb)
 * [Exploration of Sentinel-2.ipynb](https://github.com/tjlogue4/Wildfire-Prediction/blob/main/Exploration%20of%20Sentinel-2.ipynb)
+* [Logistic Regression.ipynb](https://github.com/tjlogue4/Wildfire-Prediction/blob/main/Logistic%20Regression.ipynb)
 
 ## Python Files
 * [noaa_weather.py](https://github.com/tjlogue4/Wildfire-Prediction/blob/main/noaa_weather.py)
