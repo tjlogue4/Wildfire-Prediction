@@ -23,7 +23,7 @@ General Processing
 
 Models and model testing
 * [Training SSIM](https://github.com/tjlogue4/Wildfire-Prediction/blob/main/training_ssim.py)
-* [Training Binary Cross Entropy](https://github.com/tjlogue4/Wildfire-Prediction/blob/main/training_binary_crossentropy)
+* [Training Binary Cross Entropy](https://github.com/tjlogue4/Wildfire-Prediction/blob/main/training_binary_crossentropy.py)
 * [Model Evaluation](https://github.com/tjlogue4/Wildfire-Prediction/blob/main/eval%20models.ipynb)
 * [Earth Engine Processing/ Prep](https://github.com/tjlogue4/Wildfire-Prediction/blob/main/process_for_ee.ipynb)
 
