@@ -1,6 +1,6 @@
 # Predicting Wildfires
 
-This repository was created during my masters program with the goal of using sentinel-2 satalite imagry to create a risk map for a wildfire occuring at a 10m scale based on NDVI. We also attempted to predict a fire occuring near a weather station using historical weather and logistic regression.
+This repository was created during my masters program with the goal of using sentinel-2 satalite imagry to create a risk map for a wildfire occuring at a 10m scale based on NDVI. We also attempted to predict a fire occuring near a weather station using historical weather and logistic regression. Although this was a group project, all of the code in this repository was written by me.
 
 
 ## Databases:
